@@ -16,12 +16,14 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 )
 
 func main() {
 
 	var kubeconfig *string
 
+	//get kube config file from default path or other path
 	if home := homedir.HomeDir(); home != "" {
 		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
 	} else {
@@ -52,7 +54,7 @@ func main() {
 		err    error
 	)
 
-	//use current contex
+	//check for switching between arg context or current context
 	if contextName != nil && *contextName != "" {
 		log.Printf("Switching Kubernetes context to %s", *contextName)
 		configOverrides := &clientcmd.ConfigOverrides{CurrentContext: *contextName}
@@ -72,7 +74,7 @@ func main() {
 		log.Fatalf("Error building clientSet: %s", err)
 	}
 
-	podlist, err := clientSet.CoreV1().Pods(*namespace).List(context.Background(), metav1.ListOptions{})
+	podsList, err := clientSet.CoreV1().Pods(*namespace).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		log.Fatalf("Error listing pods: %s", err)
 	}
@@ -92,7 +94,7 @@ func main() {
 
 			var realPod v1.Pod
 
-			for _, pod := range podlist.Items {
+			for _, pod := range podsList.Items {
 				if strings.Contains(pod.Name, strings.TrimSpace(podName)) {
 					log.Printf("Found pod %s as pod %s", podName, pod.Name)
 					realPod = pod
@@ -128,7 +130,8 @@ func getAndWriteLogs(req *restclient.Request, realPod v1.Pod) {
 		log.Fatalf("Error reading pod logs: %s", err)
 	}
 
-	fileName := strings.Join([]string{realPod.Name, "log"}, ".")
+	var podName = realPod.Name + "-" + time.Now().Format(time.RFC3339)
+	fileName := strings.Join([]string{podName, "log"}, ".")
 	err = os.WriteFile(fileName, logs, 0644)
 	if err != nil {
 		log.Fatalf("Error writing file: %s", err)
