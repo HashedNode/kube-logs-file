@@ -28,9 +28,9 @@ func main() {
 		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
 	}
 
-	contextName := flag.String("context", "", "Kubernetes context name")
+	contextName := flag.String("context", "", "(optional) Kubernetes context name, if not provided it will be used the default context")
 	namespace := flag.String("namespace", "", "Kubernetes namespace")
-	podNames := flag.String("pods", "", "Comma-separated list of pods names with no spaces")
+	podNames := flag.String("pods", "", "Comma-separated list of pods names with no spaces, if you want to put spaces between pods names just escape with \"\" example \"podname1, podname2\"")
 
 	flag.Parse()
 
@@ -43,6 +43,9 @@ func main() {
 	}
 
 	podsNamesList := strings.Split(*podNames, ",")
+	for i, podName := range podsNamesList {
+		podsNamesList[i] = strings.TrimSpace(podName)
+	}
 
 	var (
 		config *restclient.Config
@@ -77,6 +80,10 @@ func main() {
 	var wg sync.WaitGroup
 
 	for _, podName := range podsNamesList {
+		if podName == "" || strings.TrimSpace(podName) == "," || len(podName) == 0 {
+			continue
+		}
+
 		wg.Add(1)
 		go func(podName string) {
 			defer wg.Done()
@@ -87,6 +94,7 @@ func main() {
 
 			for _, pod := range podlist.Items {
 				if strings.Contains(pod.Name, strings.TrimSpace(podName)) {
+					log.Printf("Found pod %s as pod %s", podName, pod.Name)
 					realPod = pod
 					break
 				}
