@@ -118,11 +118,17 @@ func main() {
 
 func getAndWriteLogs(req *restclient.Request, realPod v1.Pod) {
 	podLogs, err := req.Stream(context.Background())
+	fmt.Printf("Start download logs for pod %s \n", realPod.Name)
 	if err != nil {
 		log.Fatalf("Error opening stream: %s \n for pod %s", err, realPod.Name)
 	}
 
-	defer podLogs.Close()
+	defer func() {
+		err = podLogs.Close()
+		if err != nil {
+			log.Fatalf("Error while closing the stream: %s", err)
+		}
+	}()
 
 	logs, err := io.ReadAll(podLogs)
 
@@ -132,6 +138,7 @@ func getAndWriteLogs(req *restclient.Request, realPod v1.Pod) {
 
 	var podName = realPod.Name + "-" + time.Now().Format(time.RFC3339)
 	fileName := strings.Join([]string{podName, "log"}, ".")
+	fmt.Printf("Write logs for pod %s to file %s \n", realPod.Name, fileName)
 	err = os.WriteFile(fileName, logs, 0644)
 	if err != nil {
 		log.Fatalf("Error writing file: %s", err)
